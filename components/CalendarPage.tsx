@@ -3,9 +3,9 @@
 import React, { useState, useMemo } from 'react';
 import { Calendar, Views } from 'react-big-calendar';
 import { dateFnsLocalizer } from 'react-big-calendar';
-import format from 'date-fns/format';
+import { format } from 'date-fns';
 import parse from 'date-fns/parse';
-import startOfWeek from 'date-fns/startOfWeek';
+import { startOfWeek as dateFnsStartOfWeek } from 'date-fns';
 import getDay from 'date-fns/getDay';
 import enUS from 'date-fns/locale/en-US';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
@@ -30,7 +30,7 @@ const locales = {
 const localizer = dateFnsLocalizer({
   format,
   parse,
-  startOfWeek: (date) => startOfWeek(date, { weekStartsOn: 0 }), // Sunday start
+  startOfWeek: (date: Date) => dateFnsStartOfWeek(date, { weekStartsOn: 0 }), // Sunday start
   getDay,
   locales,
 });
@@ -188,23 +188,19 @@ const mockEvents: Event[] = [
       description: '',
     });
     const [date, setDate] = useState(new Date());
-    const [calendarView, setCalendarView] = useState(Views.WEEK);
-  
-    const handleNavigate = (newDate: Date, newView: Views) => {
+    const [calendarView, setCalendarView] = useState<typeof Views[keyof typeof Views]>('week');
+
+    const handleNavigate = (newDate: Date, newView: typeof Views[keyof typeof Views]) => {
       setDate(newDate);
       setCalendarView(newView);
     };
-  
-    const handleViewChange = (newView: Views) => {
+    
+    const handleViewChange = (newView: typeof Views[keyof typeof Views]) => {
       setCalendarView(newView);
-    };
+    };    
   
-    const calendarEvents = events.map(event => ({
-      id: event.id,
-      title: event.title,
-      start: event.start,
-      end: event.end,
-    }));
+    const calendarEvents = events;
+
   
     const totalEvents = events.length;
     const upcomingEvents = events.filter(event => event.start > new Date()).length;
@@ -295,20 +291,20 @@ const mockEvents: Event[] = [
         </div>
   
         {view === 'calendar' ? (
-          <Calendar
-            localizer={localizer}
-            events={calendarEvents}  // Ensure to use mapped events
-            startAccessor="start"
-            endAccessor="end"
-            style={{ height: 500 }}
-            onSelectEvent={handleSelectEvent}
-            date={date}
-            view={calendarView}
-            onNavigate={handleNavigate}
-            onView={handleViewChange}
-            views={['week', 'day']}
-            defaultView={Views.WEEK}
-          />
+    <Calendar
+    localizer={localizer}
+    events={calendarEvents}  // Pass the full event objects
+    startAccessor="start"
+    endAccessor="end"
+    style={{ height: 500 }}
+    onSelectEvent={handleSelectEvent}
+    date={date}
+    view={calendarView}
+    onNavigate={handleNavigate}
+    onView={handleViewChange}
+    views={['week', 'day']}
+    defaultView={Views.WEEK}
+  />
         ) : (
           <div className="space-y-4">
             {events.map(event => (

@@ -38,37 +38,37 @@ const CheckoutPage = () => {
     }
   }, [plan]);
 
-  const handleParentInfoChange = (e) => {
+  const handleParentInfoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setParentInfo({ ...parentInfo, [e.target.name]: e.target.value });
-  };
+  };  
 
-  const handleChildInfoChange = (index, e) => {
+  const handleChildInfoChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const newChildren = [...children];
     newChildren[index] = { ...newChildren[index], [e.target.name]: e.target.value };
     setChildren(newChildren);
   };
-
-  const handlePaymentInfoChange = (e) => {
+  
+  const handlePaymentInfoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPaymentInfo({ ...paymentInfo, [e.target.name]: e.target.value });
   };
-
+  
   const addChild = () => {
     setChildren([...children, { name: '', age: '' }]);
   };
 
-  const removeChild = (index) => {
+  const removeChild = (index: number) => {
     const newChildren = [...children];
     newChildren.splice(index, 1);
     setChildren(newChildren);
-  };
+  };  
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     // Here you would typically process the payment and send data to your server
     console.log('Submission data:', { parentInfo, children, paymentInfo, planId: id });
     setIsSubmitted(true);
     // Here you would trigger the email sending process
-  };
+  };  
 
   if (!plan) {
     return (

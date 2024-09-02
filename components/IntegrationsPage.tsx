@@ -34,13 +34,13 @@ const IntegrationsPage = () => {
         (activeFilter === 'All' || integration.category === activeFilter)
     );
 
-    const categories = ['All', ...new Set(integrations.map(i => i.category))];
+    const categories = ['All', ...Array.from(new Set(integrations.map(i => i.category)))];
   
-    const handleToggle = (id) => {
+    const handleToggle = (id: number) => {
       setIntegrations(integrations.map(integration =>
         integration.id === id ? { ...integration, enabled: !integration.enabled } : integration
       ));
-    };
+    };    
   
     return (
       <div className="container mx-auto px-4">
