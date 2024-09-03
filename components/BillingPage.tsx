@@ -135,12 +135,19 @@ const BillingPage: React.FC = () => {
   const [currentInvoice, setCurrentInvoice] = useState<Invoice | null>(null);
   const [isDeleteConfirmationOpen, setIsDeleteConfirmationOpen] = useState(false);
   const [isPaymentMethodModalOpen, setIsPaymentMethodModalOpen] = useState(false);
-  const [currentPaymentMethod, setCurrentPaymentMethod] = useState<PaymentMethod | null>(null);
+  const [currentPaymentMethod, setCurrentPaymentMethod] = useState<PaymentMethod | null>({
+    id: '',
+    memberId: '',
+    memberName: '',
+    type: 'card',
+    last4: '',
+    expiryDate: '',
+  });
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<'all' | 'card' | 'bank'>('all');
   const [paymentMethodSearch, setPaymentMethodSearch] = useState('');
 
 
-  const billingData = {
+  const billingData: Record<TimePeriod, { revenue: number; paidInvoices: number; pendingInvoices: number; toBeProcessed: number; alreadyProcessed: number }> = {
     'This Month': { 
       revenue: 5000, 
       paidInvoices: 15, 
@@ -148,12 +155,36 @@ const BillingPage: React.FC = () => {
       toBeProcessed: 3000,
       alreadyProcessed: 2000,
     },
-    // ... (add similar data for other time periods)
+    'Last Month': {
+      revenue: 4500,
+      paidInvoices: 12,
+      pendingInvoices: 3,
+      toBeProcessed: 2500,
+      alreadyProcessed: 2000,
+    },
+    'Last 3 Months': {
+      revenue: 13000,
+      paidInvoices: 40,
+      pendingInvoices: 10,
+      toBeProcessed: 7500,
+      alreadyProcessed: 5500,
+    },
+    'This Year': {
+      revenue: 52000,
+      paidInvoices: 150,
+      pendingInvoices: 25,
+      toBeProcessed: 30000,
+      alreadyProcessed: 22000,
+    },
   };
+  
 
   const currentData = billingData[timePeriod];
 
-// ... (continued from Part 1)
+  const [formMemberName, setFormMemberName] = useState('');
+  const [formType, setFormType] = useState('card');
+  const [formLast4, setFormLast4] = useState('');
+  const [formExpiryDate, setFormExpiryDate] = useState('');
 
 const filteredInvoices = invoices
 .filter(invoice => filter === 'all' || invoice.status === filter)
@@ -187,12 +218,26 @@ setSelectedInvoices([]);
 setIsDeleteConfirmationOpen(false);
 };
 
-const handleUpdatePaymentMethod = (updatedMethod: PaymentMethod) => {
-setPaymentMethods(paymentMethods.map(method => 
-  method.id === updatedMethod.id ? updatedMethod : method
-));
-setIsPaymentMethodModalOpen(false);
+const handleAddPaymentMethod = () => {
+  const newPaymentMethod: PaymentMethod = {
+    id: Date.now().toString(),
+    memberId: Date.now().toString(),
+    memberName: currentPaymentMethod?.memberName ?? '',
+    type: currentPaymentMethod?.type ?? 'card',
+    last4: currentPaymentMethod?.last4 ?? '',
+    expiryDate: currentPaymentMethod?.expiryDate ?? '',
+  };
+
+  setPaymentMethods([...paymentMethods, newPaymentMethod]);
+  setIsPaymentMethodModalOpen(false);
 };
+
+
+  function handleUpdatePaymentMethod(updatedMethod: PaymentMethod) {
+    setPaymentMethods(paymentMethods.map(method => method.id === updatedMethod.id ? updatedMethod : method
+    ));
+    setIsPaymentMethodModalOpen(false);
+  }
 
 const handleDeletePaymentMethod = (id: string) => {
 setPaymentMethods(paymentMethods.filter(method => method.id !== id));
@@ -256,12 +301,14 @@ return (
       </Card>
     </div>
 
-    <Tabs value={activeTab} onValueChange={(value: 'invoices' | 'paymentMethods') => setActiveTab(value)}>
-      <TabsList>
-        <TabsTrigger value="invoices">Invoices</TabsTrigger>
-        <TabsTrigger value="paymentMethods">Payment Methods</TabsTrigger>
-      </TabsList>
-
+    <Tabs
+      value={activeTab}
+      onValueChange={(value) => setActiveTab(value as 'invoices' | 'paymentMethods')}
+    >
+  <TabsList>
+    <TabsTrigger value="invoices">Invoices</TabsTrigger>
+    <TabsTrigger value="paymentMethods">Payment Methods</TabsTrigger>
+  </TabsList>
       <TabsContent value="invoices">
         <div className="flex justify-between items-center mb-4">
           <Select value={timePeriod} onValueChange={(value: TimePeriod) => setTimePeriod(value)}>
@@ -520,7 +567,6 @@ return (
     </Dialog>
 
     {/* Payment Method Modal */}
- {/* Payment Method Modal */}
  <Dialog open={isPaymentMethodModalOpen} onOpenChange={setIsPaymentMethodModalOpen}>
       <DialogContent>
         <DialogHeader>
@@ -528,72 +574,72 @@ return (
         </DialogHeader>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="memberName">Member Name</Label>
-              <Input 
-                id="memberName" 
-                value={currentPaymentMethod?.memberName || ''} 
-                onChange={(e) => setCurrentPaymentMethod(prev => prev ? {...prev, memberName: e.target.value} : null)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="type">Type</Label>
-              <Select 
-                value={currentPaymentMethod?.type || 'card'}
-                onValueChange={(value: 'card' | 'bank') => setCurrentPaymentMethod(prev => prev ? {...prev, type: value} : null)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="card">Card</SelectItem>
-                  <SelectItem value="bank">Bank</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="last4">Last 4 Digits</Label>
-              <Input 
-                id="last4" 
-                value={currentPaymentMethod?.last4 || ''} 
-                onChange={(e) => setCurrentPaymentMethod(prev => prev ? {...prev, last4: e.target.value} : null)}
-                maxLength={4}
-              />
-            </div>
-            {currentPaymentMethod?.type === 'card' && (
-              <div>
-                <Label htmlFor="expiryDate">Expiry Date</Label>
-                <Input 
-                  id="expiryDate" 
-                  value={currentPaymentMethod?.expiryDate || ''} 
-                  onChange={(e) => setCurrentPaymentMethod(prev => prev ? {...prev, expiryDate: e.target.value} : null)}
-                  placeholder="MM/YY"
-                />
-              </div>
-            )}
+          <div>
+  <Label htmlFor="memberName">Member Name</Label>
+  <Input 
+    id="memberName" 
+    value={formMemberName} 
+    onChange={(e) => setFormMemberName(e.target.value)}
+  />
+</div>
+<div>
+  <Label htmlFor="type">Type</Label>
+  <Select 
+    value={formType}
+    onValueChange={(value: 'card' | 'bank') => setFormType(value)}
+  >
+    <SelectTrigger>
+      <SelectValue placeholder="Select type" />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="card">Card</SelectItem>
+      <SelectItem value="bank">Bank</SelectItem>
+    </SelectContent>
+  </Select>
+</div>
+<div>
+  <Label htmlFor="last4">Last 4 Digits</Label>
+  <Input 
+    id="last4" 
+    value={formLast4} 
+    onChange={(e) => setFormLast4(e.target.value)}
+    maxLength={4}
+  />
+</div>
+{formType === 'card' && (
+  <div>
+    <Label htmlFor="expiryDate">Expiry Date</Label>
+    <Input 
+      id="expiryDate" 
+      value={formExpiryDate} 
+      onChange={(e) => setFormExpiryDate(e.target.value)}
+      placeholder="MM/YY"
+    />
+  </div>
+)}
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setIsPaymentMethodModalOpen(false)}>Cancel</Button>
           <Button onClick={() => {
-            if (currentPaymentMethod) {
-              handleUpdatePaymentMethod(currentPaymentMethod);
-            } else {
-              // Handle adding new payment method
-              const newPaymentMethod: PaymentMethod = {
-                id: Date.now().toString(),
-                memberId: Date.now().toString(),
-                memberName: currentPaymentMethod?.memberName || '',
-                type: currentPaymentMethod?.type || 'card',
-                last4: currentPaymentMethod?.last4 || '',
-                expiryDate: currentPaymentMethod?.expiryDate,
-              };
-              setPaymentMethods([...paymentMethods, newPaymentMethod]);
-            }
-            setIsPaymentMethodModalOpen(false);
-          }}>
-            {currentPaymentMethod ? 'Update' : 'Add'}
-          </Button>
+  if (currentPaymentMethod) {
+    handleUpdatePaymentMethod(currentPaymentMethod);
+  } else {
+    // Handle adding new payment method
+    const newPaymentMethod: PaymentMethod = {
+      id: Date.now().toString(),
+      memberId: Date.now().toString(),
+      memberName: formMemberName,
+      type: formType as 'card' | 'bank', // Fix: Update the type of formType
+      last4: formLast4,
+      expiryDate: formExpiryDate,
+    };
+    setPaymentMethods([...paymentMethods, newPaymentMethod]);
+  }
+  setIsPaymentMethodModalOpen(false);
+}}>
+  {currentPaymentMethod ? 'Update' : 'Add'}
+</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -327,14 +327,14 @@ const MarketingPage = () => {
                   <TableCell>{lead.email}</TableCell>
                   <TableCell>{lead.source}</TableCell>
                   <TableCell>
-                    <Badge variant={
-                      lead.status === 'New' ? 'default' :
-                      lead.status === 'Contacted' ? 'secondary' :
-                      lead.status === 'Qualified' ? 'success' : 'destructive'
-                    }>
-                      {lead.status}
-                    </Badge>
-                  </TableCell>
+  <Badge variant={
+    lead.status === 'New' ? 'default' :
+    lead.status === 'Contacted' ? 'secondary' :
+    lead.status === 'Qualified' ? 'secondary' : 'destructive'
+  }>
+    {lead.status}
+  </Badge>
+</TableCell>
                   <TableCell>{lead.lastContact}</TableCell>
                   <TableCell>{lead.interests.join(", ")}</TableCell>
                   <TableCell>{lead.campaigns.join(", ")}</TableCell>
