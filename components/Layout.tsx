@@ -18,7 +18,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { FileText, Bell, Search, Settings, LogOut, Home, Users, Megaphone, Calendar, DollarSign, BarChart2, ChevronLeft, ChevronRight, Plug } from 'lucide-react';
+import { FileText, Bell, Search, Settings, LogOut, Home, Users, Megaphone, Calendar, DollarSign, BarChart2, ChevronLeft, Globe, ChevronRight, Plug } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import Head from 'next/head';
 
@@ -32,7 +32,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar }: { isCollapsed: boolean, toggleS
         <div className="flex items-center justify-between mb-2">
           {!isCollapsed && (
             <h2 className="px-4 text-lg font-semibold tracking-tight">
-              YouthSports Pro
+              Gameface 
             </h2>
           )}
           <Button variant="ghost" size="icon" onClick={toggleSidebar}>
@@ -45,6 +45,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar }: { isCollapsed: boolean, toggleS
             { href: "/plans", icon: FileText, label: "Plans" },
             { href: "/members", icon: Users, label: "Members" },
             { href: "/marketing", icon: Megaphone, label: "Marketing" },
+            { href: "/website", icon: Globe, label: "Website" },
             { href: "/calendar", icon: Calendar, label: "Calendar" },
             { href: "/billing", icon: DollarSign, label: "Billing" },
             { href: "/reports", icon: BarChart2, label: "Reports" },

@@ -1,33 +1,19 @@
 'use client';
 
 import React, { useState } from 'react';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { DollarSign, FileText, TrendingUp, TrendingDown } from 'lucide-react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { DollarSign, FileText, CreditCard, PlusCircle, Edit, Trash2, HelpCircle, Download, Search, Filter } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { format, addDays, isPast, isFuture } from 'date-fns';
 
 type Invoice = {
   id: string;
@@ -140,114 +126,204 @@ const BillingPage: React.FC = () => {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(mockPaymentMethods);
   const [activeTab, setActiveTab] = useState<'invoices' | 'paymentMethods'>('invoices');
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('This Month');
+  const [filter, setFilter] = useState<'all' | 'paid' | 'pending' | 'overdue'>('all');
+  const [sort, setSort] = useState<'dueDate' | 'amount'>('dueDate');
+  const [search, setSearch] = useState('');
+  const [selectedInvoices, setSelectedInvoices] = useState<string[]>([]);
+  const [isCreateInvoiceOpen, setIsCreateInvoiceOpen] = useState(false);
+  const [isViewInvoiceOpen, setIsViewInvoiceOpen] = useState(false);
+  const [currentInvoice, setCurrentInvoice] = useState<Invoice | null>(null);
+  const [isDeleteConfirmationOpen, setIsDeleteConfirmationOpen] = useState(false);
+  const [isPaymentMethodModalOpen, setIsPaymentMethodModalOpen] = useState(false);
+  const [currentPaymentMethod, setCurrentPaymentMethod] = useState<PaymentMethod | null>(null);
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState<'all' | 'card' | 'bank'>('all');
+  const [paymentMethodSearch, setPaymentMethodSearch] = useState('');
+
 
   const billingData = {
-    'This Month': { revenue: 450, paidInvoices: 1, pendingInvoices: 1, trends: { revenue: 10, paidInvoices: 0, pendingInvoices: -5 } },
-    'Last Month': { revenue: 400, paidInvoices: 1, pendingInvoices: 2, trends: { revenue: 5, paidInvoices: -10, pendingInvoices: 15 } },
-    'Last 3 Months': { revenue: 1200, paidInvoices: 4, pendingInvoices: 3, trends: { revenue: 15, paidInvoices: 20, pendingInvoices: -10 } },
-    'This Year': { revenue: 5000, paidInvoices: 15, pendingInvoices: 5, trends: { revenue: 25, paidInvoices: 30, pendingInvoices: -20 } },
+    'This Month': { 
+      revenue: 5000, 
+      paidInvoices: 15, 
+      pendingInvoices: 5, 
+      toBeProcessed: 3000,
+      alreadyProcessed: 2000,
+    },
+    // ... (add similar data for other time periods)
   };
 
   const currentData = billingData[timePeriod];
 
-  const TrendIndicator: React.FC<{ value: number }> = ({ value }) => (
-    <span className={`flex items-center ${value >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-      {value >= 0 ? <TrendingUp className="w-4 h-4 mr-1" /> : <TrendingDown className="w-4 h-4 mr-1" />}
-      {Math.abs(value)}%
-    </span>
-  );
+// ... (continued from Part 1)
 
-  const handleCreateInvoice = () => {
-    console.log('Create new invoice');
-  };
+const filteredInvoices = invoices
+.filter(invoice => filter === 'all' || invoice.status === filter)
+.filter(invoice => 
+  invoice.memberName.toLowerCase().includes(search.toLowerCase()) ||
+  invoice.amount.toString().includes(search)
+)
+.sort((a, b) => {
+  if (sort === 'dueDate') {
+    return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+  } else {
+    return a.amount - b.amount;
+  }
+});
 
-  const handleDeleteInvoice = (id: string) => {
-    setInvoices(invoices.filter(invoice => invoice.id !== id));
-  };
+const filteredPaymentMethods = paymentMethods
+.filter(method => paymentMethodFilter === 'all' || method.type === paymentMethodFilter)
+.filter(method => 
+  method.memberName.toLowerCase().includes(paymentMethodSearch.toLowerCase()) ||
+  method.last4.includes(paymentMethodSearch)
+);
 
-  const handleAddPaymentMethod = () => {
-    console.log('Add new payment method');
-  };
+const handleCreateInvoice = (newInvoice: Invoice) => {
+setInvoices([...invoices, newInvoice]);
+setIsCreateInvoiceOpen(false);
+};
 
-  const handleUpdatePaymentMethod = (id: string) => {
-    console.log('Update payment method', id);
-  };
+const handleDeleteInvoices = () => {
+setInvoices(invoices.filter(invoice => !selectedInvoices.includes(invoice.id)));
+setSelectedInvoices([]);
+setIsDeleteConfirmationOpen(false);
+};
 
-  return (
-    <div className="space-y-6">
+const handleUpdatePaymentMethod = (updatedMethod: PaymentMethod) => {
+setPaymentMethods(paymentMethods.map(method => 
+  method.id === updatedMethod.id ? updatedMethod : method
+));
+setIsPaymentMethodModalOpen(false);
+};
+
+const handleDeletePaymentMethod = (id: string) => {
+setPaymentMethods(paymentMethods.filter(method => method.id !== id));
+setIsPaymentMethodModalOpen(false);
+};
+
+return (
+  <div className="space-y-6">
+    <div className="flex justify-between items-center">
       <h1 className="text-3xl font-bold">Billing</h1>
-      
-      <div className="flex justify-end">
-        <Select onValueChange={(value: TimePeriod) => setTimePeriod(value)}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder={timePeriod} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="This Month">This Month</SelectItem>
-            <SelectItem value="Last Month">Last Month</SelectItem>
-            <SelectItem value="Last 3 Months">Last 3 Months</SelectItem>
-            <SelectItem value="This Year">This Year</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="outline" size="icon">
+              <HelpCircle className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Manage invoices and payment methods for your organization here.</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    </div>
+    
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+          <DollarSign className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">${currentData.revenue.toLocaleString()}</div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">To Be Processed</CardTitle>
+          <FileText className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">${currentData.toBeProcessed.toLocaleString()}</div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Already Processed</CardTitle>
+          <CreditCard className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">${currentData.alreadyProcessed.toLocaleString()}</div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Pending Invoices</CardTitle>
+          <FileText className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{currentData.pendingInvoices}</div>
+        </CardContent>
+      </Card>
+    </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${currentData.revenue}</div>
-            <div className="text-xs text-muted-foreground">
-              <TrendIndicator value={currentData.trends.revenue} /> from previous period
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Paid Invoices</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{currentData.paidInvoices}</div>
-            <div className="text-xs text-muted-foreground">
-              <TrendIndicator value={currentData.trends.paidInvoices} /> from previous period
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Invoices</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{currentData.pendingInvoices}</div>
-            <div className="text-xs text-muted-foreground">
-              <TrendIndicator value={currentData.trends.pendingInvoices} /> from previous period
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+    <Tabs value={activeTab} onValueChange={(value: 'invoices' | 'paymentMethods') => setActiveTab(value)}>
+      <TabsList>
+        <TabsTrigger value="invoices">Invoices</TabsTrigger>
+        <TabsTrigger value="paymentMethods">Payment Methods</TabsTrigger>
+      </TabsList>
 
-      <Tabs defaultValue="invoices" className="space-y-4">
-        <div className="flex justify-between items-center">
-          <TabsList>
-            <TabsTrigger value="invoices" onClick={() => setActiveTab('invoices')}>Invoices</TabsTrigger>
-            <TabsTrigger value="paymentMethods" onClick={() => setActiveTab('paymentMethods')}>Payment Methods</TabsTrigger>
-          </TabsList>
-          {activeTab === 'invoices' ? (
-            <Button onClick={handleCreateInvoice}>Create Invoice</Button>
-          ) : (
-            <Button onClick={handleAddPaymentMethod}>Add Payment Method</Button>
-          )}
+      <TabsContent value="invoices">
+        <div className="flex justify-between items-center mb-4">
+          <Select value={timePeriod} onValueChange={(value: TimePeriod) => setTimePeriod(value)}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder={timePeriod} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="This Month">This Month</SelectItem>
+              <SelectItem value="Last Month">Last Month</SelectItem>
+              <SelectItem value="Last 3 Months">Last 3 Months</SelectItem>
+              <SelectItem value="This Year">This Year</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="flex space-x-2">
+            <Input
+              placeholder="Search..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-[200px]"
+            />
+            <Select value={filter} onValueChange={(value: any) => setFilter(value)}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Filter" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="paid">Paid</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="overdue">Overdue</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={sort} onValueChange={(value: any) => setSort(value)}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Sort" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="dueDate">Due Date</SelectItem>
+                <SelectItem value="amount">Amount</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button onClick={() => setIsCreateInvoiceOpen(true)}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Create Invoice
+            </Button>
+          </div>
         </div>
-
-        <TabsContent value="invoices">
-          <div className="rounded-md border">
+        <Card>
+          <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[50px]">
+                    <Checkbox
+                      checked={selectedInvoices.length === filteredInvoices.length}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedInvoices(filteredInvoices.map(i => i.id));
+                        } else {
+                          setSelectedInvoices([]);
+                        }
+                      }}
+                    />
+                  </TableHead>
                   <TableHead>Member</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Status</TableHead>
@@ -256,42 +332,89 @@ const BillingPage: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {invoices.map((invoice) => (
-                  <TableRow key={invoice.id}>
-                    <TableCell className="font-medium">{invoice.memberName}</TableCell>
-                    <TableCell>${invoice.amount}</TableCell>
-                    <TableCell>{invoice.status}</TableCell>
-                    <TableCell>{invoice.dueDate}</TableCell>
-                    <TableCell>
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button variant="outline" size="sm" className="mr-2">View</Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Invoice Details</DialogTitle>
-                            <DialogDescription>
-                              Invoice for {invoice.memberName}
-                            </DialogDescription>
-                          </DialogHeader>
-                          <div className="mt-4">
-                            <p>Amount: ${invoice.amount}</p>
-                            <p>Status: {invoice.status}</p>
-                            <p>Due Date: {invoice.dueDate}</p>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                      <Button variant="destructive" size="sm" onClick={() => handleDeleteInvoice(invoice.id)}>Delete</Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {filteredInvoices.map((invoice) => {
+                  const dueDate = new Date(invoice.dueDate);
+                  const isUpcoming = isFuture(dueDate) && isPast(addDays(new Date(), 7));
+                  return (
+                    <TableRow key={invoice.id} className={isUpcoming ? 'bg-yellow-50' : ''}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedInvoices.includes(invoice.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedInvoices([...selectedInvoices, invoice.id]);
+                            } else {
+                              setSelectedInvoices(selectedInvoices.filter(id => id !== invoice.id));
+                            }
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell className="font-medium">{invoice.memberName}</TableCell>
+                      <TableCell>${invoice.amount}</TableCell>
+                      <TableCell>
+                        <Badge variant={invoice.status === 'paid' ? 'default' : (invoice.status === 'pending' ? 'secondary' : 'destructive')}>
+                          {invoice.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{format(new Date(invoice.dueDate), 'MMM dd, yyyy')}</TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="sm" className="mr-2" onClick={() => {
+                          setCurrentInvoice(invoice);
+                          setIsViewInvoiceOpen(true);
+                        }}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => {
+                          // Implement PDF download logic
+                        }}>
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
+          </CardContent>
+        </Card>
+        {selectedInvoices.length > 0 && (
+          <div className="flex justify-end mt-4">
+            <Button variant="destructive" onClick={() => setIsDeleteConfirmationOpen(true)}>
+              Delete Selected Invoices
+            </Button>
           </div>
-        </TabsContent>
+        )}
+      </TabsContent>
 
-        <TabsContent value="paymentMethods">
-          <div className="rounded-md border">
+      <TabsContent value="paymentMethods">
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex space-x-2">
+            <Input
+              placeholder="Search payment methods..."
+              value={paymentMethodSearch}
+              onChange={(e) => setPaymentMethodSearch(e.target.value)}
+              className="w-[250px]"
+            />
+            <Select value={paymentMethodFilter} onValueChange={(value: any) => setPaymentMethodFilter(value)}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Filter" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="card">Card</SelectItem>
+                <SelectItem value="bank">Bank</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Button onClick={() => {
+            setCurrentPaymentMethod(null);
+            setIsPaymentMethodModalOpen(true);
+          }}>
+            <PlusCircle className="mr-2 h-4 w-4" /> Add Payment Method
+          </Button>
+        </div>
+        <Card>
+          <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -303,24 +426,206 @@ const BillingPage: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paymentMethods.map((method) => (
+                {filteredPaymentMethods.map((method) => (
                   <TableRow key={method.id}>
                     <TableCell className="font-medium">{method.memberName}</TableCell>
                     <TableCell>{method.type}</TableCell>
                     <TableCell>**** {method.last4}</TableCell>
                     <TableCell>{method.expiryDate || 'N/A'}</TableCell>
                     <TableCell>
-                      <Button variant="outline" size="sm" onClick={() => handleUpdatePaymentMethod(method.id)}>Update</Button>
+                      <Button variant="ghost" size="sm" className="mr-2" onClick={() => {
+                        setCurrentPaymentMethod(method);
+                        setIsPaymentMethodModalOpen(true);
+                      }}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => {
+                        setCurrentPaymentMethod(method);
+                        setIsDeleteConfirmationOpen(true);
+                      }}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
+          </CardContent>
+        </Card>
+      </TabsContent>
+    </Tabs>
+
+    {/* Create Invoice Modal */}
+    <Dialog open={isCreateInvoiceOpen} onOpenChange={setIsCreateInvoiceOpen}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Create New Invoice</DialogTitle>
+        </DialogHeader>
+        {/* Add form fields for creating a new invoice */}
+        <DialogFooter>
+          <Button onClick={() => setIsCreateInvoiceOpen(false)}>Cancel</Button>
+          <Button onClick={() => {
+            // Implement create invoice logic
+            setIsCreateInvoiceOpen(false);
+          }}>Create</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    {/* View/Edit Invoice Modal */}
+    <Dialog open={isViewInvoiceOpen} onOpenChange={setIsViewInvoiceOpen}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Invoice Details</DialogTitle>
+        </DialogHeader>
+        {currentInvoice && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="memberName">Member Name</Label>
+                <Input id="memberName" value={currentInvoice.memberName} readOnly />
+              </div>
+              <div>
+                <Label htmlFor="amount">Amount</Label>
+                <Input id="amount" type="number" value={currentInvoice.amount} />
+              </div>
+              <div>
+                <Label htmlFor="status">Status</Label>
+                <Select value={currentInvoice.status}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="paid">Paid</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="overdue">Overdue</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="dueDate">Due Date</Label>
+                <Input id="dueDate" type="date" value={currentInvoice.dueDate} />
+              </div>
+            </div>
           </div>
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
+        )}
+        <DialogFooter>
+          <Button onClick={() => setIsViewInvoiceOpen(false)}>Close</Button>
+          <Button onClick={() => {
+            // Implement update invoice logic
+            setIsViewInvoiceOpen(false);
+          }}>Update</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    {/* Payment Method Modal */}
+ {/* Payment Method Modal */}
+ <Dialog open={isPaymentMethodModalOpen} onOpenChange={setIsPaymentMethodModalOpen}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{currentPaymentMethod ? 'Edit Payment Method' : 'Add Payment Method'}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="memberName">Member Name</Label>
+              <Input 
+                id="memberName" 
+                value={currentPaymentMethod?.memberName || ''} 
+                onChange={(e) => setCurrentPaymentMethod(prev => prev ? {...prev, memberName: e.target.value} : null)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="type">Type</Label>
+              <Select 
+                value={currentPaymentMethod?.type || 'card'}
+                onValueChange={(value: 'card' | 'bank') => setCurrentPaymentMethod(prev => prev ? {...prev, type: value} : null)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="card">Card</SelectItem>
+                  <SelectItem value="bank">Bank</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="last4">Last 4 Digits</Label>
+              <Input 
+                id="last4" 
+                value={currentPaymentMethod?.last4 || ''} 
+                onChange={(e) => setCurrentPaymentMethod(prev => prev ? {...prev, last4: e.target.value} : null)}
+                maxLength={4}
+              />
+            </div>
+            {currentPaymentMethod?.type === 'card' && (
+              <div>
+                <Label htmlFor="expiryDate">Expiry Date</Label>
+                <Input 
+                  id="expiryDate" 
+                  value={currentPaymentMethod?.expiryDate || ''} 
+                  onChange={(e) => setCurrentPaymentMethod(prev => prev ? {...prev, expiryDate: e.target.value} : null)}
+                  placeholder="MM/YY"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setIsPaymentMethodModalOpen(false)}>Cancel</Button>
+          <Button onClick={() => {
+            if (currentPaymentMethod) {
+              handleUpdatePaymentMethod(currentPaymentMethod);
+            } else {
+              // Handle adding new payment method
+              const newPaymentMethod: PaymentMethod = {
+                id: Date.now().toString(),
+                memberId: Date.now().toString(),
+                memberName: currentPaymentMethod?.memberName || '',
+                type: currentPaymentMethod?.type || 'card',
+                last4: currentPaymentMethod?.last4 || '',
+                expiryDate: currentPaymentMethod?.expiryDate,
+              };
+              setPaymentMethods([...paymentMethods, newPaymentMethod]);
+            }
+            setIsPaymentMethodModalOpen(false);
+          }}>
+            {currentPaymentMethod ? 'Update' : 'Add'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    {/* Delete Confirmation Modal */}
+    <Dialog open={isDeleteConfirmationOpen} onOpenChange={setIsDeleteConfirmationOpen}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Confirm Deletion</DialogTitle>
+          <DialogDescription>
+            {activeTab === 'invoices'
+              ? 'Are you sure you want to delete the selected invoices? This action cannot be undone.'
+              : `Are you sure you want to delete the payment method for ${currentPaymentMethod?.memberName}? This action cannot be undone.`
+            }
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setIsDeleteConfirmationOpen(false)}>Cancel</Button>
+          <Button variant="destructive" onClick={() => {
+            if (activeTab === 'invoices') {
+              handleDeleteInvoices();
+            } else {
+              handleDeletePaymentMethod(currentPaymentMethod!.id);
+            }
+            setIsDeleteConfirmationOpen(false);
+          }}>Delete</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  </div>
+);
+
 };
 
 export default BillingPage;

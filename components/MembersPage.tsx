@@ -1,18 +1,18 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, UserCheck, UserMinus } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Users, UserCheck, UserMinus, PlusCircle, Edit, Trash2, Mail, Download, HelpCircle } from 'lucide-react';
 
 // Define member type
 type Member = {
@@ -73,9 +73,22 @@ const initialMembers: Member[] = [
 ];
 
 const MembersPage: React.FC = () => {
-  const [members, setMembers] = useState<Member[]>(initialMembers);
+  const [members, setMembers] = useState<Member[]>([]);
   const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+  const [isAddMemberDialogOpen, setIsAddMemberDialogOpen] = useState(false);
+  const [isEditMemberDialogOpen, setIsEditMemberDialogOpen] = useState(false);
+  const [isDeleteConfirmationOpen, setIsDeleteConfirmationOpen] = useState(false);
+  const [isBulkEmailDialogOpen, setIsBulkEmailDialogOpen] = useState(false);
+  const [currentMember, setCurrentMember] = useState<Member | null>(null);
+  const [bulkEmailContent, setBulkEmailContent] = useState('');
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setMembers(initialMembers);
+    setIsClient(true);
+  }, []);
 
   const filteredMembers = members
     .filter(member => {
@@ -93,27 +106,85 @@ const MembersPage: React.FC = () => {
   const activeMembers = members.filter(member => member.isActive).length;
   const inactiveMembers = totalMembers - activeMembers;
 
-  const handleEdit = (id: string) => {
-    console.log('Edit member', id);
+  const handleEdit = (member: Member) => {
+    setCurrentMember(member);
+    setIsEditMemberDialogOpen(true);
   };
 
   const handleDelete = (id: string) => {
-    setMembers(members.filter(member => member.id !== id));
+    setCurrentMember(members.find(m => m.id === id) || null);
+    setIsDeleteConfirmationOpen(true);
   };
 
-  const handleEmail = (email: string) => {
-    console.log('Email sent to', email);
+  const handleDeleteConfirm = () => {
+    if (currentMember) {
+      setMembers(members.filter(member => member.id !== currentMember.id));
+      setIsDeleteConfirmationOpen(false);
+      setCurrentMember(null);
+    }
   };
 
-  const handleAddMember = () => {
-    console.log('Add new member');
+  const handleBulkEmail = () => {
+    const selectedMemberEmails = members
+      .filter(member => selectedMembers.includes(member.id))
+      .map(member => member.parentEmail)
+      .join(', ');
+    setBulkEmailContent(`To: ${selectedMemberEmails}\n\nDear Parents,\n\n[Your message here]\n\nBest regards,\nYouth Sports Pro Team`);
+    setIsBulkEmailDialogOpen(true);
   };
+
+  const handleSendBulkEmail = () => {
+    console.log('Sending bulk email:', bulkEmailContent);
+    setIsBulkEmailDialogOpen(false);
+    setBulkEmailContent('');
+    setSelectedMembers([]);
+  };
+
+  const handleDownloadCSV = () => {
+    const headers = ['First Name', 'Last Name', 'Age', 'Parent Name', 'Parent Email', 'Status'];
+    const csvContent = [
+      headers.join(','),
+      ...members.map(member => 
+        [member.firstName, member.lastName, member.age, member.parentName, member.parentEmail, member.isActive ? 'Active' : 'Inactive'].join(',')
+      )
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', 'members.csv');
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
+  if (!isClient) {
+    return null; // or a loading spinner
+  }
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Members</h1>
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold">Members</h1>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="outline" size="icon">
+                <HelpCircle className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Manage all your members, view their details, and perform actions like sending emails or updating records.</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
       
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Members</CardTitle>
@@ -144,63 +215,154 @@ const MembersPage: React.FC = () => {
       </div>
 
       <div className="flex justify-between items-center">
-        <Input 
-          placeholder="Search members..." 
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="max-w-sm"
-        />
+        <div className="flex items-center space-x-2">
+          <Input 
+            placeholder="Search members..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-[300px]"
+          />
+          <Select value={filter} onValueChange={(value: any) => setFilter(value)}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Filter members" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Members</SelectItem>
+              <SelectItem value="active">Active Members</SelectItem>
+              <SelectItem value="inactive">Inactive Members</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <div className="space-x-2">
-          <Button 
-            variant={filter === 'all' ? "default" : "outline"} 
-            onClick={() => setFilter('all')}
-          >
-            All
+          <Button onClick={handleBulkEmail} disabled={selectedMembers.length === 0}>
+            <Mail className="mr-2 h-4 w-4" /> Bulk Email
           </Button>
-          <Button 
-            variant={filter === 'active' ? "default" : "outline"} 
-            onClick={() => setFilter('active')}
-          >
-            Active
+          <Button onClick={handleDownloadCSV}>
+            <Download className="mr-2 h-4 w-4" /> Download CSV
           </Button>
-          <Button 
-            variant={filter === 'inactive' ? "default" : "outline"} 
-            onClick={() => setFilter('inactive')}
-          >
-            Inactive
-          </Button>
-          <Button variant="default" onClick={handleAddMember}>Add Member</Button>
+          <Dialog open={isAddMemberDialogOpen} onOpenChange={setIsAddMemberDialogOpen}>
+            <DialogTrigger asChild>
+              <Button><PlusCircle className="mr-2 h-4 w-4" /> Add Member</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New Member</DialogTitle>
+              </DialogHeader>
+              {/* Add member form fields here */}
+              <DialogFooter>
+                <Button onClick={() => setIsAddMemberDialogOpen(false)}>Add Member</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Age</TableHead>
-              <TableHead>Parent</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredMembers.map((member) => (
-              <TableRow key={member.id}>
-                <TableCell className="font-medium">{member.firstName} {member.lastName}</TableCell>
-                <TableCell>{member.age}</TableCell>
-                <TableCell>{member.parentName}</TableCell>
-                <TableCell>{member.isActive ? 'Active' : 'Inactive'}</TableCell>
-                <TableCell>
-                  <Button variant="outline" size="sm" onClick={() => handleEdit(member.id)} className="mr-2">Edit</Button>
-                  <Button variant="outline" size="sm" onClick={() => handleEmail(member.parentEmail)} className="mr-2">Email</Button>
-                  <Button variant="destructive" size="sm" onClick={() => handleDelete(member.id)}>Remove</Button>
-                </TableCell>
+      <Card>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[50px]">
+                  <Checkbox
+                    checked={selectedMembers.length === filteredMembers.length}
+                    onCheckedChange={(checked) => {
+                      setSelectedMembers(checked 
+                        ? filteredMembers.map(m => m.id)
+                        : []
+                      )
+                    }}
+                  />
+                </TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Age</TableHead>
+                <TableHead>Parent</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+            </TableHeader>
+            <TableBody>
+              {filteredMembers.map((member) => (
+                <TableRow key={member.id}>
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedMembers.includes(member.id)}
+                      onCheckedChange={(checked) => {
+                        setSelectedMembers(checked
+                          ? [...selectedMembers, member.id]
+                          : selectedMembers.filter(id => id !== member.id)
+                        )
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell className="font-medium">{member.firstName} {member.lastName}</TableCell>
+                  <TableCell>{member.age}</TableCell>
+                  <TableCell>{member.parentName}</TableCell>
+                  <TableCell>{member.isActive ? 'Active' : 'Inactive'}</TableCell>
+                  <TableCell>
+                    <Button variant="ghost" size="sm" onClick={() => handleEdit(member)}>
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => handleDelete(member.id)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Edit Member Dialog */}
+      <Dialog open={isEditMemberDialogOpen} onOpenChange={setIsEditMemberDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Member</DialogTitle>
+          </DialogHeader>
+          {/* Add edit member form fields here */}
+          <DialogFooter>
+            <Button onClick={() => setIsEditMemberDialogOpen(false)}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteConfirmationOpen} onOpenChange={setIsDeleteConfirmationOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Deletion</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete {currentMember?.firstName} {currentMember?.lastName}? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteConfirmationOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDeleteConfirm}>Delete</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Email Dialog */}
+      <Dialog open={isBulkEmailDialogOpen} onOpenChange={setIsBulkEmailDialogOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Send Bulk Email</DialogTitle>
+          </DialogHeader>
+          <div className="mt-4">
+            <Label htmlFor="emailContent">Email Content</Label>
+            <textarea
+              id="emailContent"
+              value={bulkEmailContent}
+              onChange={(e) => setBulkEmailContent(e.target.value)}
+              className="w-full h-64 p-2 border rounded-md"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsBulkEmailDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleSendBulkEmail}>Send Email</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
